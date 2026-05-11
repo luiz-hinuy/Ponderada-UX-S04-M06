@@ -1,71 +1,61 @@
-// ============================================================
-//  ANÁLISE DE DECISÃO DE CRÉDITO — Infográfico Interativo p5.js
-//  Mostra: importância dos parâmetros + perfil dos aprovados
-// ============================================================
-
 let W, H;
 let section = 0;
 let animT = 0;
-let hoveredBar = -1;
 let particles = [];
-let expandedRow = -1; // linha expandida no painel de sensibilidade
+let expandedRow = -1;
 
-// ── Dados da decisão ─────────────────────────────────────────
 const decision = {
   approved: true,
   creditLimit: 12500,
-  score: 742,
   risk: "BAIXO",
-  riskColor: [0, 230, 150],
+  riskColor: [0, 186, 255],
 };
 
-// Parâmetros com explicações e impactos direcionais
 const params = [
   {
-    name: "Score de Crédito",
-    weight: 0.34, value: "742", unit: "pts", color: [0, 210, 255],
-    explain: "Pontuação histórica de comportamento de crédito (escala 0–1000)",
-    upEffect:   "Score sobe → limite aprovado aumenta / risco cai",
-    downEffect: "Score abaixo de 650 → risco alto, possível negação",
+    name: "Prob. de Inadimplência",
+    weight: 0.31, value: "12% estimado", color: [0, 186, 255],
+    explain: "Probabilidade estimada de o solicitante não pagar a fatura",
+    upEffect:   "Prob. cai → modelo tende a aprovar limites maiores",
+    downEffect: "Prob. sobe → modelo reduz limite ou nega o crédito",
   },
   {
     name: "Renda Mensal",
-    weight: 0.22, value: "R$4.800", unit: "", color: [100, 180, 255],
-    explain: "Renda declarada — base para calcular capacidade de pagamento",
-    upEffect:   "Renda sobe → limite proporcional à renda cresce",
-    downEffect: "Renda menor → limite reduzido ou crédito negado",
+    weight: 0.24, value: "R$ 4.800", color: [0, 155, 220],
+    explain: "Renda declarada — base da capacidade de pagamento",
+    upEffect:   "Renda sobe → limite proporcional cresce",
+    downEffect: "Renda menor → limite reduzido ou negado",
   },
   {
     name: "Tempo de Emprego",
-    weight: 0.17, value: "3.2", unit: "anos", color: [180, 130, 255],
-    explain: "Estabilidade no emprego atual — indica previsibilidade de renda",
+    weight: 0.18, value: "3,2 anos", color: [0, 210, 255],
+    explain: "Estabilidade profissional — previsibilidade de renda",
     upEffect:   "Mais tempo → reduz risco percebido pelo modelo",
-    downEffect: "Menos de 1 ano → penalização, fator de instabilidade",
+    downEffect: "Menos de 1 ano → fator de instabilidade",
   },
   {
-    name: "Razão Dívida/Renda",
-    weight: 0.13, value: "0.28", unit: "", color: [255, 190, 80],
-    explain: "Fração da renda já comprometida com dívidas (ideal: < 0.35)",
-    upEffect:   "Razão sobe → modelo reduz limite, risco de inadimplência maior",
-    downEffect: "Razão menor → mais margem disponível, limite tende a subir",
+    name: "Razão Dívida / Renda",
+    weight: 0.14, value: "0,28  (ideal < 0,35)", color: [255, 200, 60],
+    explain: "Fração da renda comprometida com dívidas",
+    upEffect:   "Razão sobe → modelo penaliza com limite menor",
+    downEffect: "Razão menor → mais margem, limite tende a subir",
   },
   {
     name: "Histórico de Pagamentos",
-    weight: 0.09, value: "94%", unit: "", color: [80, 220, 180],
+    weight: 0.09, value: "94% no prazo", color: [0, 230, 200],
     explain: "% de parcelas pagas no prazo nos últimos 24 meses",
     upEffect:   "100% → sinal forte de confiabilidade",
-    downEffect: "Abaixo de 80% → penalização significativa no resultado",
+    downEffect: "Abaixo de 80% → penalização significativa",
   },
   {
     name: "Nº de Dependentes",
-    weight: 0.05, value: "1", unit: "dep.", color: [255, 140, 140],
-    explain: "Número de pessoas financeiramente dependentes do solicitante",
-    upEffect:   "Mais dependentes → reduz levemente a margem disponível",
-    downEffect: "Nenhum dependente → impacto pequeno, mas ligeiramente positivo",
+    weight: 0.04, value: "1 dependente", color: [255, 100, 130],
+    explain: "Pessoas financeiramente dependentes do solicitante",
+    upEffect:   "Mais dependentes → reduz a margem disponível",
+    downEffect: "Nenhum → impacto pequeno, mas positivo",
   },
 ];
 
-// Clientes históricos da base (NÃO inclui o cliente atual)
 const similarClients = [
   { score: 710, income: 4200, debtRatio: 0.31, approved: true,  limit: 10500 },
   { score: 760, income: 5100, debtRatio: 0.25, approved: true,  limit: 13200 },
@@ -83,46 +73,38 @@ const similarClients = [
 
 let tabs = [];
 
-// ── Setup ─────────────────────────────────────────────────────
 function setup() {
-  W = min(windowWidth, 900);
-  H = min(windowHeight, 660);
+  W = windowWidth;
+  H = windowHeight;
   createCanvas(W, H);
   textFont("monospace");
-
   tabs = [
     { label: "DECISÃO",       x: 0,       w: W / 3 },
     { label: "SENSIBILIDADE", x: W / 3,   w: W / 3 },
     { label: "PERFIL",        x: 2*W/3,   w: W / 3 },
   ];
-
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 50; i++) {
     particles.push({
       x: random(W), y: random(H),
       vx: random(-0.3, 0.3), vy: random(-0.15, -0.05),
-      size: random(1, 3), alpha: random(40, 120),
+      size: random(1, 3), alpha: random(30, 90),
     });
   }
 }
 
-// ── Draw ──────────────────────────────────────────────────────
 function draw() {
-  background(13, 13, 20);
-  animT += 0.02;
-
+  background(10, 20, 32);
+  animT += 0.075;
   drawParticles();
   drawHeader();
   drawTabs();
-
-  let contentY = 110;
+  let contentY = 120;
   if (section === 0) drawDecisionPanel(contentY);
   if (section === 1) drawSensitivityPanel(contentY);
   if (section === 2) drawProfilePanel(contentY);
-
   drawFooter();
 }
 
-// ── Partículas ────────────────────────────────────────────────
 function drawParticles() {
   noStroke();
   for (let p of particles) {
@@ -130,375 +112,300 @@ function drawParticles() {
     if (p.y < 0) p.y = H;
     if (p.x < 0) p.x = W;
     if (p.x > W) p.x = 0;
-    fill(80, 160, 255, p.alpha * (0.5 + 0.5 * sin(animT + p.x)));
+    fill(0, 186, 255, p.alpha * (0.5 + 0.5 * sin(animT + p.x * 0.05)));
     ellipse(p.x, p.y, p.size);
   }
 }
 
-// ── Header ────────────────────────────────────────────────────
 function drawHeader() {
-  stroke(40, 40, 70);
-  strokeWeight(1);
-  line(0, 44, W, 44);
-
+  stroke(26, 52, 72); strokeWeight(1);
+  line(0, 50, W, 50);
   noStroke();
-  fill(180, 180, 220);
-  textSize(10);
-  textAlign(LEFT, CENTER);
-  text("SISTEMA DE CRÉDITO  //  ANÁLISE DE DECISÃO", 20, 22);
-
-  let bx = W - 120;
+  fill(180, 220, 240); textSize(13); textAlign(LEFT, CENTER);
+  text("SISTEMA DE CRÉDITO  //  ANÁLISE DE DECISÃO", 24, 25);
   let [r, g, b] = decision.riskColor;
-  fill(r, g, b, 30);
-  stroke(r, g, b, 120);
-  strokeWeight(1);
-  rect(bx, 12, 100, 20, 4);
-  noStroke();
-  fill(r, g, b);
-  textSize(9);
-  textAlign(CENTER, CENTER);
-  text(`RISCO ${decision.risk}`, bx + 50, 22);
+  let bx = W - 150;
+  fill(r, g, b, 30); stroke(r, g, b, 120); strokeWeight(1);
+  rect(bx, 12, 126, 26, 5);
+  noStroke(); fill(r, g, b); textSize(12); textAlign(CENTER, CENTER);
+  text(`RISCO ${decision.risk}`, bx + 63, 25);
 }
 
-// ── Tabs ──────────────────────────────────────────────────────
 function drawTabs() {
   for (let i = 0; i < tabs.length; i++) {
     let t = tabs[i];
     let active = section === i;
-    let hovered = mouseX > t.x && mouseX < t.x + t.w && mouseY > 48 && mouseY < 80;
-
+    let hov = mouseX > t.x && mouseX < t.x + t.w && mouseY > 54 && mouseY < 92;
+    if (active)   { fill(10, 30, 50); stroke(0, 186, 255, 180); }
+    else if (hov) { fill(14, 28, 44); stroke(40, 80, 110); }
+    else          { fill(10, 20, 32); stroke(20, 44, 62); }
+    strokeWeight(1); rect(t.x, 54, t.w, 38);
     if (active) {
-      fill(20, 20, 40); stroke(0, 180, 255, 180);
-    } else if (hovered) {
-      fill(20, 20, 35); stroke(60, 60, 100);
-    } else {
-      fill(13, 13, 20); stroke(30, 30, 55);
+      let uw = t.w * 0.5, ux = t.x + t.w / 2 - uw / 2;
+      stroke(0, 186, 255); strokeWeight(2);
+      line(ux, 92, ux + uw, 92);
     }
-    strokeWeight(1);
-    rect(t.x, 48, t.w, 34);
-
-    if (active) {
-      let uw = t.w * 0.6;
-      let ux = t.x + t.w / 2 - uw / 2;
-      stroke(0, 180, 255); strokeWeight(2);
-      line(ux, 82, ux + uw, 82);
-    }
-
     noStroke();
-    fill(active ? color(0, 200, 255) : color(120, 120, 160));
-    textSize(9);
-    textAlign(CENTER, CENTER);
-    text(t.label, t.x + t.w / 2, 65);
+    fill(active ? color(0, 186, 255) : color(120, 160, 180));
+    textSize(12); textAlign(CENTER, CENTER);
+    text(t.label, t.x + t.w / 2, 73);
   }
 }
 
-// ── PAINEL 0: Decisão ─────────────────────────────────────────
+// painel de decisao
 function drawDecisionPanel(y) {
-  let cx = W / 2;
-  let ringY = y + 130;
-  let scoreNorm = map(decision.score, 300, 850, 0, 1);
-  let sweepAngle = TWO_PI * scoreNorm;
   let [r, g, b] = decision.riskColor;
+  let cx = W / 2;
 
-  stroke(30, 30, 50); strokeWeight(14); noFill();
-  arc(cx, ringY, 170, 170, -HALF_PI, -HALF_PI + TWO_PI);
+  // área de conteúdo centralizada
+  let cardW = min(W * 0.55, 520);
+  let bx    = cx - cardW / 2;
+  let by    = y + 30;
 
-  let drawn = min(animT * 0.8, sweepAngle);
-  stroke(r, g, b); strokeWeight(14);
-  arc(cx, ringY, 170, 170, -HALF_PI, -HALF_PI + drawn);
-  stroke(r, g, b, 40); strokeWeight(22);
-  arc(cx, ringY, 170, 170, -HALF_PI, -HALF_PI + drawn);
-
+  // card status
+  let [sr, sg, sb] = decision.approved ? [0, 186, 255] : [255, 77, 109];
+  fill(sr, sg, sb, 18); stroke(sr, sg, sb, 100); strokeWeight(1);
+  rect(bx, by, cardW, 72, 8);
   noStroke();
-  fill(255); textSize(38); textAlign(CENTER, CENTER);
-  text(decision.score, cx, ringY - 12);
-  fill(r, g, b); textSize(10);
-  text("SCORE", cx, ringY + 20);
+  fill(sr, sg, sb); textSize(15); textAlign(CENTER, CENTER);
+  text(decision.approved ? "✔  CRÉDITO APROVADO" : "✖  CRÉDITO NEGADO", cx, by + 26);
+  fill(255, 255, 255, 160); textSize(11);
+  text("Decisão gerada pelo método Simplex", cx, by + 52);
 
-  fill(255, 255, 255, 200); textSize(12);
-  text("LIMITE APROVADO", cx, ringY + 55);
-  fill(r, g, b); textSize(28);
-  text(`R$ ${decision.creditLimit.toLocaleString("pt-BR")}`, cx, ringY + 82);
+  let ly = by + 88;
+  fill(10, 28, 46); stroke(r, g, b, 100); strokeWeight(1);
+  rect(bx, ly, cardW, 96, 8);
+  noStroke();
+  fill(140, 200, 230); textSize(12); textAlign(CENTER, TOP);
+  text("LIMITE APROVADO", cx, ly + 14);
+  fill(r, g, b); textSize(46); textAlign(CENTER, CENTER);
+  text("R$ " + decision.creditLimit.toLocaleString("pt-BR"), cx, ly + 62);
 
+  // cards de métricas secundárias
   let metrics = [
-    { label: "SCORE",  val: decision.score + " pts",                          side: -1 },
-    { label: "RISCO",  val: decision.risk,                                    side: -1 },
-    { label: "LIMITE", val: "R$ " + (decision.creditLimit/1000).toFixed(1)+"k", side: 1 },
-    { label: "STATUS", val: decision.approved ? "APROVADO" : "NEGADO",        side: 1 },
+    { label: "RISCO",  val: decision.risk  },
+    { label: "PRAZO",  val: "36 meses"     },
+    { label: "TAXA",   val: "2,4% a.m."    },
+    { label: "PARCELA",val: "R$ 347"       },
   ];
-
+  let gap    = 8;
+  let mCardW = (cardW - gap * (metrics.length - 1)) / metrics.length;
+  let mY     = ly + 112;
   for (let i = 0; i < metrics.length; i++) {
-    let m = metrics[i];
-    let myCorrected = ringY - 30 + i * 40;
-    fill(20, 20, 40); stroke(40, 40, 70); strokeWeight(1);
-    rect(m.side === -1 ? cx - 230 : cx + 120, myCorrected - 18, 100, 36, 4);
+    let mx = bx + i * (mCardW + gap);
+    fill(12, 24, 40); stroke(24, 50, 70); strokeWeight(1);
+    rect(mx, mY, mCardW, 64, 6);
     noStroke();
-    fill(100, 100, 140); textSize(8); textAlign(CENTER, CENTER);
-    text(m.label, m.side === -1 ? cx - 180 : cx + 170, myCorrected - 6);
-    fill(m.label === "STATUS" ? color(r, g, b) : 255); textSize(13);
-    text(m.val, m.side === -1 ? cx - 180 : cx + 170, myCorrected + 10);
+    fill(80, 140, 170); textSize(10); textAlign(CENTER, TOP);
+    text(metrics[i].label, mx + mCardW / 2, mY + 10);
+    fill(i === 0 ? color(r, g, b) : 225);
+    textSize(14); textAlign(CENTER, CENTER);
+    text(metrics[i].val, mx + mCardW / 2, mY + 40);
   }
 
-  fill(80, 80, 120); textSize(9); textAlign(CENTER, BOTTOM);
-  text("← clique nas abas para explorar a análise →", cx, H - 50);
+  fill(50, 110, 150); textSize(11); textAlign(CENTER, BOTTOM);
+  text("← use as abas acima para explorar a análise →", cx, H - 40);
 }
 
-// ── PAINEL 1: Sensibilidade ───────────────────────────────────
+// painel de sensibilidade
 function drawSensitivityPanel(y) {
-  let padL = 50, padR = 40;
+  let padL = 60, padR = 60;
   let barArea = W - padL - padR;
-  let rowH = 46;
+  let rowH = 56;
 
-  // Cabeçalho explicativo
   noStroke();
-  fill(0, 180, 255); textSize(10); textAlign(LEFT, TOP);
-  text("IMPORTÂNCIA DOS PARÂMETROS NA DECISÃO", padL, y);
-
-  fill(160, 160, 200); textSize(8);
-  text("O percentual indica o quanto cada parâmetro pesou para chegar ao resultado acima.", padL, y + 14);
-  fill(80, 80, 120); textSize(8);
-  text("Clique em um parâmetro para ver o que acontece se ele subir ou baixar.", padL, y + 26);
+  fill(0, 186, 255); textSize(14); textAlign(LEFT, TOP);
+  text("VARIÁVEIS DO MODELO  //  IMPACTO NA DECISÃO", padL, y);
+  fill(140, 200, 230); textSize(12);
+  text("O % representa o peso de cada variável na resposta do modelo. Quanto maior, mais aquela variável determina se o crédito é aprovado ou negado.", padL, y + 20);
 
   for (let i = 0; i < params.length; i++) {
     let p = params[i];
     let expanded = expandedRow === i;
-    let ry = y + 44 + i * rowH + (expanded ? 0 : 0);
-    // Adjust y for previously expanded rows above
+    let ry = y + 52 + i * rowH;
     for (let k = 0; k < i; k++) {
-      if (expandedRow === k) ry += 36;
+      if (expandedRow === k) ry += 48;
     }
-
     let [pr, pg, pb] = p.color;
-    let rowBottom = expanded ? ry + rowH + 36 : ry + rowH;
-    let hovered = mouseX > padL && mouseX < W - padR &&
-                  mouseY > ry && mouseY < rowBottom - 4;
+    let rowBottom = expanded ? ry + rowH + 48 : ry + rowH;
+    let hov = mouseX > padL - 10 && mouseX < W - padR + 10 &&
+              mouseY > ry && mouseY < rowBottom - 2;
 
-    // linha de fundo ao hover
-    if (hovered || expanded) {
-      fill(pr, pg, pb, 8); noStroke();
-      rect(padL - 8, ry, barArea + 16, expanded ? rowH + 36 : rowH - 4, 3);
+    if (hov || expanded) {
+      fill(pr, pg, pb, 10); noStroke();
+      rect(padL - 10, ry + 2, barArea + 20, expanded ? rowH + 46 : rowH - 4, 4);
     }
 
-    // label + explicação
-    fill(hovered || expanded ? 255 : 180); textSize(9); textAlign(LEFT, CENTER);
-    text(p.name, padL, ry + 10);
+    fill(hov || expanded ? 255 : 190); textSize(13); textAlign(LEFT, TOP);
+    text(p.name, padL, ry + 6);
+    fill(90, 150, 180); textSize(11); textAlign(LEFT, TOP);
+    text(p.explain, padL, ry + 24);
 
-    // explicação inline em cinza
-    fill(100, 100, 140); textSize(7.5); textAlign(LEFT, CENTER);
-    text(p.explain, padL, ry + 22);
+    fill(pr, pg, pb); textSize(13); textAlign(RIGHT, TOP);
+    text(p.value, W - padR, ry + 6);
+    fill(pr, pg, pb, 190); textSize(11); textAlign(RIGHT, TOP);
+    text(`${(p.weight * 100).toFixed(0)}% de impacto`, W - padR, ry + 24);
 
-    // valor do parâmetro
-    fill(pr, pg, pb); textSize(9); textAlign(RIGHT, CENTER);
-    text(`${p.value} ${p.unit}`, W - padR, ry + 10);
-
-    // porcentagem grande
-    fill(pr, pg, pb, 180); textSize(8); textAlign(RIGHT, CENTER);
-    text(`${(p.weight * 100).toFixed(0)}% do peso`, W - padR, ry + 24);
-
-    // trilha
-    fill(25, 25, 45); noStroke();
-    rect(padL, ry + 30, barArea, 9, 3);
-
-    // barra animada
+    fill(15, 35, 55); noStroke();
+    rect(padL, ry + 40, barArea, 11, 4);
     let targetW = barArea * p.weight;
-    let drawnW = max(0, min(animT * 60 - i * 20, targetW));
-    fill(pr, pg, pb, hovered || expanded ? 220 : 160);
-    rect(padL, ry + 30, drawnW, 9, 3);
+    let drawnW  = max(0, min(animT * 70 - i * 22, targetW));
+    fill(pr, pg, pb, hov || expanded ? 230 : 170);
+    rect(padL, ry + 40, drawnW, 11, 4);
 
-    // detalhe expandido ao clicar
     if (expanded) {
-      let ey = ry + rowH + 2;
-      // painel de impacto
-      fill(18, 18, 38); stroke(pr, pg, pb, 80); strokeWeight(1);
-      rect(padL, ey, barArea, 30, 3);
+      let ey = ry + rowH + 4;
+      fill(16, 16, 36); stroke(pr, pg, pb, 70); strokeWeight(1);
+      rect(padL, ey, barArea, 40, 4);
       noStroke();
-
-      // ↑ impacto
-      fill(0, 220, 130); textSize(8); textAlign(LEFT, CENTER);
-      text("▲  " + p.upEffect, padL + 8, ey + 9);
-
-      // ↓ impacto
-      fill(255, 100, 100); textSize(8); textAlign(LEFT, CENTER);
-      text("▼  " + p.downEffect, padL + 8, ey + 22);
+      fill(0, 220, 130); textSize(12); textAlign(LEFT, CENTER);
+      text("▲  " + p.upEffect,   padL + 12, ey + 13);
+      fill(255, 90, 90); textSize(12);
+      text("▼  " + p.downEffect, padL + 12, ey + 30);
+    }
+    if (hov && !expanded) {
+      fill(pr, pg, pb, 120); textSize(10); textAlign(RIGHT, TOP);
+      text("clique para ver impactos ↓", W - padR, ry + 40);
     }
   }
 }
 
-// ── PAINEL 2: Perfil dos Clientes Históricos ──────────────────
+// painel de perfil
 function drawProfilePanel(y) {
   noStroke();
-  fill(0, 180, 255); textSize(10); textAlign(LEFT, TOP);
-  text("BASE HISTÓRICA DE CLIENTES  //  SCORE × RENDA MENSAL", 40, y);
+  fill(0, 186, 255); textSize(14); textAlign(LEFT, TOP);
+  text("BASE HISTÓRICA DE CLIENTES  //  SCORE × RENDA", 50, y);
+  fill(140, 200, 230); textSize(11);
+  text("Cada ponto representa um cliente da base histórica. Tamanho do ponto = limite concedido. Passe o mouse para detalhes.", 50, y + 20);
 
-  fill(160, 160, 200); textSize(8);
-  text("Cada ponto é um cliente histórico. Clientes com perfil semelhante ao atual tendem a se agrupar na mesma região.", 40, y + 13);
-  fill(80, 80, 120); textSize(8);
-  text("Tamanho do ponto = limite concedido.  Verde = aprovado.  Vermelho = negado.  Passe o mouse para ver detalhes.", 40, y + 24);
-
-  let plotX = 80, plotY = y + 42;
-  let plotW = W - 160;
-  let plotH = H - plotY - 80;
-
+  let plotX = 90, plotY = y + 48;
+  let plotW = W - 180, plotH = H - plotY - 70;
   let scoreMin = 620, scoreMax = 820;
   let incomeMin = 3000, incomeMax = 6500;
 
-  // fundo
-  fill(15, 15, 30); stroke(30, 30, 55); strokeWeight(1);
-  rect(plotX, plotY, plotW, plotH, 4);
+  fill(10, 22, 38); stroke(20, 46, 66); strokeWeight(1);
+  rect(plotX, plotY, plotW, plotH, 6);
 
-  // grid + tick labels
-  stroke(28, 28, 50); strokeWeight(1);
-  let scoreSteps = [640, 680, 720, 760, 800];
-  for (let sv of scoreSteps) {
+  stroke(18, 40, 60); strokeWeight(1);
+  for (let sv of [640, 680, 720, 760, 800]) {
     let gx = map(sv, scoreMin, scoreMax, plotX, plotX + plotW);
     line(gx, plotY, gx, plotY + plotH);
-    noStroke(); fill(55, 55, 90); textSize(7); textAlign(CENTER, TOP);
-    text(sv, gx, plotY + plotH + 4);
-    stroke(28, 28, 50);
+    noStroke(); fill(50, 110, 150); textSize(11); textAlign(CENTER, TOP);
+    text(sv, gx, plotY + plotH + 6);
+    stroke(18, 40, 60);
   }
-  let incomeSteps = [3500, 4000, 4500, 5000, 5500, 6000];
-  for (let iv of incomeSteps) {
+  for (let iv of [3500, 4000, 4500, 5000, 5500, 6000]) {
     let gy = map(iv, incomeMin, incomeMax, plotY + plotH, plotY);
     line(plotX, gy, plotX + plotW, gy);
-    noStroke(); fill(55, 55, 90); textSize(7); textAlign(RIGHT, CENTER);
-    text("R$" + (iv/1000).toFixed(1)+"k", plotX - 4, gy);
-    stroke(28, 28, 50);
+    noStroke(); fill(50, 110, 150); textSize(11); textAlign(RIGHT, CENTER);
+    text("R$" + (iv / 1000).toFixed(0) + "k", plotX - 6, gy);
+    stroke(18, 40, 60);
   }
 
-  // eixos
-  stroke(40, 40, 70); strokeWeight(1);
+  stroke(30, 60, 90); strokeWeight(1);
   line(plotX, plotY + plotH, plotX + plotW, plotY + plotH);
   line(plotX, plotY, plotX, plotY + plotH);
 
-  // labels eixos
-  noStroke(); fill(90, 90, 130); textSize(8);
+  noStroke(); fill(70, 140, 180); textSize(12);
   textAlign(CENTER, TOP);
-  text("SCORE DE CRÉDITO →", plotX + plotW / 2, plotY + plotH + 16);
+  text("SCORE DE CRÉDITO →", plotX + plotW / 2, plotY + plotH + 22);
   push();
-  translate(plotX - 42, plotY + plotH / 2);
+  translate(plotX - 56, plotY + plotH / 2);
   rotate(-HALF_PI); textAlign(CENTER, CENTER);
   text("RENDA MENSAL →", 0, 0);
   pop();
 
-  // zona de aprovação aproximada
   let zoneX1 = map(700, scoreMin, scoreMax, plotX, plotX + plotW);
   let zoneY1 = map(3800, incomeMin, incomeMax, plotY + plotH, plotY);
-  fill(0, 200, 120, 12); noStroke();
+  fill(0, 186, 255, 10); noStroke();
   rect(zoneX1, plotY + 4, plotX + plotW - zoneX1, zoneY1 - plotY - 4, 3);
-  fill(0, 200, 120, 50); textSize(7.5); textAlign(LEFT, TOP);
-  text("zona típica de aprovação", zoneX1 + 4, plotY + 6);
+  fill(0, 186, 255, 80); textSize(11); textAlign(LEFT, TOP);
+  text("zona típica de aprovação", zoneX1 + 6, plotY + 8);
 
-  // pontos
   let tooltipData = null;
-  for (let i = 0; i < similarClients.length; i++) {
-    let c = similarClients[i];
-    let px = map(c.score, scoreMin, scoreMax, plotX + 10, plotX + plotW - 10);
-    let py = map(c.income, incomeMin, incomeMax, plotY + plotH - 10, plotY + 10);
-    let sz = c.approved ? map(c.limit, 8000, 16000, 12, 26) : 10;
-    let hov = dist(mouseX, mouseY, px, py) < sz + 10;
-    let [cr, cg, cb] = c.approved ? [0, 220, 140] : [255, 80, 80];
+  for (let c of similarClients) {
+    let px = map(c.score,  scoreMin,  scoreMax,  plotX + 14, plotX + plotW - 14);
+    let py = map(c.income, incomeMin, incomeMax, plotY + plotH - 14, plotY + 14);
+    let sz = c.approved ? map(c.limit, 8000, 16000, 14, 30) : 12;
+    let hov = dist(mouseX, mouseY, px, py) < sz + 12;
+    let [cr, cg, cb] = c.approved ? [0, 186, 255] : [255, 77, 109];
 
-    if (hov) { fill(cr, cg, cb, 25); noStroke(); ellipse(px, py, sz * 3); }
-
-    if (hov || !c.approved) {
-      fill(cr, cg, cb, hov ? 220 : 130); noStroke();
-    } else {
-      fill(cr, cg, cb, 160); noStroke();
-    }
-
-    if (hov) { stroke(255, 255, 255, 100); strokeWeight(1); }
-    else noStroke();
+    if (hov) { fill(cr, cg, cb, 20); noStroke(); ellipse(px, py, sz * 3.5); }
+    noStroke();
+    fill(cr, cg, cb, hov ? 230 : (c.approved ? 170 : 140));
+    if (hov) { stroke(255, 255, 255, 80); strokeWeight(1); }
     ellipse(px, py, sz);
-
+    noStroke();
     if (hov) tooltipData = { c, px, py, cr, cg, cb, sz };
   }
 
-  // tooltip por cima de tudo
   if (tooltipData) {
     let { c, px, py, cr, cg, cb, sz } = tooltipData;
-    let tipW = 170, tipH = c.approved ? 74 : 60;
-    let tx = px + sz + 6;
-    let ty = py - tipH / 2;
-    if (tx + tipW > plotX + plotW - 4) tx = px - tipW - sz - 6;
-    if (ty < plotY + 4) ty = plotY + 4;
-    if (ty + tipH > plotY + plotH - 4) ty = plotY + plotH - tipH - 4;
+    let tipW = 200, tipH = c.approved ? 100 : 80;
+    let tx = px + sz + 8;
+    let ty = constrain(py - tipH / 2, plotY + 4, plotY + plotH - tipH - 4);
+    if (tx + tipW > plotX + plotW - 4) tx = px - tipW - sz - 8;
 
-    fill(14, 14, 30, 245); stroke(cr, cg, cb, 180); strokeWeight(1);
-    rect(tx, ty, tipW, tipH, 4);
+    fill(8, 22, 40, 252); stroke(cr, cg, cb, 200); strokeWeight(1);
+    rect(tx, ty, tipW, tipH, 5);
     noStroke();
-
-    fill(cr, cg, cb); textSize(8.5); textAlign(LEFT, TOP);
-    text(c.approved ? "● APROVADO" : "● NEGADO", tx + 8, ty + 8);
-
-    fill(200, 200, 220); textSize(8);
-    text(`Score:  ${c.score} pts`, tx + 8, ty + 22);
-    text(`Renda:  R$${c.income.toLocaleString("pt-BR")}`, tx + 8, ty + 33);
-    text(`D/R:    ${c.debtRatio} (${c.debtRatio < 0.35 ? "dentro do ideal" : "acima do ideal"})`, tx + 8, ty + 44);
+    fill(cr, cg, cb); textSize(12); textAlign(LEFT, TOP);
+    text(c.approved ? "● APROVADO" : "● NEGADO", tx + 10, ty + 10);
+    fill(180, 220, 240); textSize(11);
+    text(`Score:  ${c.score} pts`,                         tx + 10, ty + 28);
+    text(`Renda:  R$ ${c.income.toLocaleString("pt-BR")}`, tx + 10, ty + 42);
+    text(`D/R:    ${c.debtRatio}  ${c.debtRatio < 0.35 ? "(dentro do ideal)" : "(acima do ideal)"}`, tx + 10, ty + 56);
     if (c.approved) {
-      fill(cr, cg, cb);
-      text(`Limite: R$${c.limit.toLocaleString("pt-BR")}`, tx + 8, ty + 55);
-      fill(100, 100, 140); textSize(7);
-      text(`≈ ${(c.limit / c.income).toFixed(1)}x a renda mensal`, tx + 8, ty + 65);
+      fill(cr, cg, cb); textSize(12);
+      text(`Limite: R$ ${c.limit.toLocaleString("pt-BR")}`, tx + 10, ty + 72);
+      fill(70, 140, 180); textSize(10);
+      text(`≈ ${(c.limit / c.income).toFixed(1)}× a renda mensal`, tx + 10, ty + 88);
     }
   }
 
-  // legenda
-  let lx = plotX + plotW - 148;
-  fill(14, 14, 30, 220); stroke(30, 30, 55); strokeWeight(1);
-  rect(lx - 6, plotY + 8, 150, 54, 4);
+  let lx = plotX + plotW - 220;
+  fill(8, 22, 40, 220); stroke(20, 46, 66); strokeWeight(1);
+  rect(lx - 8, plotY + 10, 224, 68, 5);
   noStroke();
-
-  fill(0, 220, 140); ellipse(lx + 6, plotY + 22, 9);
-  fill(180); textSize(8); textAlign(LEFT, CENTER);
-  text("Aprovado — tamanho = limite", lx + 16, plotY + 22);
-
-  fill(255, 80, 80); ellipse(lx + 6, plotY + 38, 9);
-  fill(180);
-  text("Negado — sem limite concedido", lx + 16, plotY + 38);
-
-  fill(0, 200, 120, 40); rect(lx + 2, plotY + 50, 8, 8, 2);
-  fill(0, 200, 120, 160); textSize(7.5);
-  text("zona típica de aprovação", lx + 16, plotY + 54);
+  fill(0, 186, 255);  ellipse(lx + 8, plotY + 28, 12);
+  fill(190); textSize(11); textAlign(LEFT, CENTER);
+  text("Aprovado  —  tamanho = limite", lx + 20, plotY + 28);
+  fill(255, 77, 109);  ellipse(lx + 8, plotY + 50, 12);
+  fill(190);
+  text("Negado  —  sem limite concedido", lx + 20, plotY + 50);
+  fill(0, 186, 255, 30); rect(lx + 3, plotY + 62, 10, 10, 2);
+  fill(0, 186, 255, 180); textSize(10);
+  text("zona típica de aprovação", lx + 20, plotY + 67);
 }
 
-// ── Rodapé ────────────────────────────────────────────────────
 function drawFooter() {
-  stroke(30, 30, 55); strokeWeight(1);
-  line(0, H - 28, W, H - 28);
-  noStroke(); fill(50, 50, 80); textSize(8);
+  stroke(20, 46, 66); strokeWeight(1);
+  line(0, H - 32, W, H - 32);
+  noStroke(); fill(60, 120, 160); textSize(11);
   textAlign(LEFT, CENTER);
-  text("MODELO  //  RANDOM FOREST  //  CONCESSÃO DE CRÉDITO  //  v1.0", 20, H - 14);
+  text("MODELO  //  SIMPLEX  //  CONCESSÃO DE CRÉDITO  //  v1.0", 24, H - 16);
   textAlign(RIGHT, CENTER);
-  text("INTELI — UX CC06", W - 20, H - 14);
+  text("INTELI — UX CC06", W - 24, H - 16);
 }
 
-// ── Interação ─────────────────────────────────────────────────
 function mousePressed() {
-  // troca de aba
   for (let i = 0; i < tabs.length; i++) {
     let t = tabs[i];
-    if (mouseX > t.x && mouseX < t.x + t.w && mouseY > 48 && mouseY < 82) {
+    if (mouseX > t.x && mouseX < t.x + t.w && mouseY > 54 && mouseY < 92) {
       if (section !== i) { section = i; animT = 0; expandedRow = -1; }
       return;
     }
   }
-
-  // expansão de linha na aba de sensibilidade
   if (section === 1) {
-    let padL = 50, padR = 40;
-    let barArea = W - padL - padR;
-    let rowH = 46;
-    let baseY = 110 + 44;
-
+    let padL = 60, padR = 60;
+    let rowH = 56, baseY = 120 + 52;
     for (let i = 0; i < params.length; i++) {
       let ry = baseY + i * rowH;
-      for (let k = 0; k < i; k++) {
-        if (expandedRow === k) ry += 36;
-      }
-      let rowBottom = expandedRow === i ? ry + rowH + 36 : ry + rowH;
-      if (mouseX > padL - 8 && mouseX < W - padR + 8 &&
-          mouseY > ry && mouseY < rowBottom - 4) {
-        expandedRow = expandedRow === i ? -1 : i;
+      for (let k = 0; k < i; k++) { if (expandedRow === k) ry += 48; }
+      let rowBottom = expandedRow === i ? ry + rowH + 48 : ry + rowH;
+      if (mouseX > padL - 10 && mouseX < W - padR + 10 &&
+          mouseY > ry && mouseY < rowBottom - 2) {
+        expandedRow = (expandedRow === i) ? -1 : i;
         return;
       }
     }
@@ -506,10 +413,9 @@ function mousePressed() {
 }
 
 function windowResized() {
-  W = min(windowWidth, 900);
-  H = min(windowHeight, 660);
+  W = windowWidth; H = windowHeight;
   resizeCanvas(W, H);
   tabs[0].w = tabs[1].w = tabs[2].w = W / 3;
-  tabs[1].x = W / 3;
-  tabs[2].x = 2 * W / 3;
+  tabs[1].x = W / 3; tabs[2].x = 2 * W / 3;
+  for (let p of particles) { p.x = random(W); p.y = random(H); }
 }
